@@ -30,13 +30,18 @@ class LLMProvider(ABC):
         pass
 
 class OpenAIProvider(LLMProvider):
-    """OpenAI provider implementation."""
+    """Generic LLM provider implementation."""
 
     def get_model_name(self) -> str:
-        # Stagehand expects "openai/gpt-4o"
-        if not settings.llm_model.startswith("openai/"):
-            return f"openai/{settings.llm_model}"
-        return settings.llm_model
+        provider = settings.llm_provider.lower()
+        model = settings.llm_model
+        
+        # If model already has a provider prefix, return as is
+        if "/" in model:
+            return model
+            
+        # Otherwise, prefix it with the configured provider
+        return f"{provider}/{model}"
 
     def get_api_key(self) -> str:
         return settings.llm_api_key
@@ -47,7 +52,19 @@ class OpenAIProvider(LLMProvider):
             "Authorization": f"Bearer {self.get_api_key()}",
             "Content-Type": "application/json"
         }
-        model = self.get_model_name().replace("openai/", "")
+        
+        # Determine the base URL based on provider
+        provider = settings.llm_provider.lower()
+        if provider == "google":
+            # For raw chat fallback, point to a standard openai compatible endpoint if available, 
+            # or just use litellm style endpoints. For now we use the OpenRouter/OpenAI fallback URL
+            base_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        elif hasattr(settings, 'llm_base_url') and settings.llm_base_url:
+            base_url = f"{settings.llm_base_url}/chat/completions"
+        else:
+            base_url = "https://api.openai.com/v1/chat/completions"
+            
+        model = self.get_model_name().split("/")[-1]
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
