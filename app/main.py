@@ -1,7 +1,13 @@
+import sys
+import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Awaitable, Callable
+
+if sys.platform == "win32":
+    # Required for Playwright/Stagehand to spawn subprocesses on Windows
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
