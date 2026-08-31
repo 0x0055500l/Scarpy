@@ -108,18 +108,10 @@ class AIBrowserLayer:
         self.logger.info("Starting AI Browser Layer")
         try:
             self._browser = await local_browser.launch(headless=self.headless)
-            
-            # Since Stagehand has extremely strict Pydantic regex validation for strings
-            # we must construct an object with a generate() method to bypass the string check
-            # if we want custom models without crashing initialization. Stagehand expects
-            # a callable type LLMGenerateCallback (which we simulate via a simple async function)
-            async def fallback_llm(*args, **kwargs):
-                raise NotImplementedError("Fallback LLM invoked by Stagehand")
-
             self.stagehand = await Stagehand.create(
                 browser=self._browser,
                 model_api_key=self.llm_provider.get_api_key(),
-                model=self.llm_provider.get_model_name() if settings.llm_provider.lower() == "openai" else fallback_llm,
+                model=self.llm_provider.get_model_name(),
             )
             pages = await self.stagehand.browser.context.pages()
             self.page = pages[0] if pages else await self.stagehand.browser.context.new_page()
