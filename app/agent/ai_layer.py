@@ -75,7 +75,7 @@ class OpenAIProvider(LLMProvider):
             return "{\"mock\": \"true\"}"
 
         async with httpx.AsyncClient() as client:
-            resp = await client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=30.0)
+            resp = await client.post(base_url, headers=headers, json=payload, timeout=30.0)
             resp.raise_for_status()
             data = resp.json()
             return str(data["choices"][0]["message"]["content"])
