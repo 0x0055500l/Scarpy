@@ -48,37 +48,49 @@ class OpenAIProvider(LLMProvider):
 
     async def chat(self, prompt: str) -> str:
         import httpx
-        headers = {
-            "Authorization": f"Bearer {self.get_api_key()}",
-            "Content-Type": "application/json"
-        }
         
-        # Determine the base URL based on provider
         provider = settings.llm_provider.lower()
-        if provider == "google":
-            # For raw chat fallback, point to a standard openai compatible endpoint if available, 
-            # or just use litellm style endpoints. For now we use the OpenRouter/OpenAI fallback URL
-            base_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-        elif hasattr(settings, 'llm_base_url') and settings.llm_base_url:
-            base_url = f"{settings.llm_base_url}/chat/completions"
-        else:
-            base_url = "https://api.openai.com/v1/chat/completions"
-            
         model = self.get_model_name().split("/")[-1]
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.0,
-        }
+
         # In test mode with fake key, just return a mock response
         if self.get_api_key().startswith("fake"):
             return "{\"mock\": \"true\"}"
 
         async with httpx.AsyncClient() as client:
-            resp = await client.post(base_url, headers=headers, json=payload, timeout=30.0)
-            resp.raise_for_status()
-            data = resp.json()
-            return str(data["choices"][0]["message"]["content"])
+            if provider == "google":
+                # Use native Google API to avoid compatibility endpoint 404s
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.get_api_key()}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.0}
+                }
+                resp = await client.post(url, json=payload, timeout=30.0)
+                resp.raise_for_status()
+                data = resp.json()
+                try:
+                    return str(data["candidates"][0]["content"]["parts"][0]["text"])
+                except (KeyError, IndexError):
+                    return ""
+            else:
+                # Standard OpenAI compatible endpoint
+                headers = {
+                    "Authorization": f"Bearer {self.get_api_key()}",
+                    "Content-Type": "application/json"
+                }
+                if hasattr(settings, 'llm_base_url') and settings.llm_base_url:
+                    base_url = f"{settings.llm_base_url}/chat/completions"
+                else:
+                    base_url = "https://api.openai.com/v1/chat/completions"
+
+                payload = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.0,
+                }
+                resp = await client.post(base_url, headers=headers, json=payload, timeout=30.0)
+                resp.raise_for_status()
+                data = resp.json()
+                return str(data["choices"][0]["message"]["content"])
 
 class AIBrowserLayer:
     """AI Browser Layer wrapping Stagehand and Playwright."""
