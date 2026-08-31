@@ -311,10 +311,15 @@ class AutonomousWebAgent:
                     success = await self.ai_layer.act(instruction)
 
             elif step.action_type == "extract":
-                if not extract_schema:
-                    raise ValueError("extract_schema is required for extraction steps")
+                schema_to_use = extract_schema
+                if not schema_to_use:
+                    from pydantic import BaseModel, Field
+                    class GenericExtraction(BaseModel):
+                        extracted_info: str = Field(description="The information extracted based on the instruction")
+                    schema_to_use = GenericExtraction
+                    
                 self.state.status = AgentStatus.EXTRACTING
-                data = await self.ai_layer.extract(step.description, extract_schema)
+                data = await self.ai_layer.extract(step.description, schema_to_use)
                 if data:
                     self.state.extracted_data.update(data if isinstance(data, dict) else data.model_dump())
                     success = True
