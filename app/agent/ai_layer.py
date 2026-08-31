@@ -116,11 +116,10 @@ class AIBrowserLayer:
             async def fallback_llm(*args, **kwargs):
                 raise NotImplementedError("Fallback LLM invoked by Stagehand")
 
-            is_openai = settings.llm_provider.lower() == "openai"
             self.stagehand = await Stagehand.create(
                 browser=self._browser,
-                model_api_key=self.llm_provider.get_api_key() if is_openai else None,
-                model=self.llm_provider.get_model_name() if is_openai else fallback_llm,
+                model_api_key=self.llm_provider.get_api_key(),
+                model=self.llm_provider.get_model_name() if settings.llm_provider.lower() == "openai" else fallback_llm,
             )
             pages = await self.stagehand.browser.context.pages()
             self.page = pages[0] if pages else await self.stagehand.browser.context.new_page()
